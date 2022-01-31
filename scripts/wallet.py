@@ -2,7 +2,7 @@
 
 import os
 from brownie import *
-from brownie import Token, accounts, network, Wallet, SwapContract, ContractContainer
+from brownie import Wallet, accounts, network
 from distutils.util import strtobool
 
 
@@ -12,4 +12,4 @@ def main():
     dev = accounts.add(os.getenv('PRIVATE_KEY'))
     publish_source = True if os.getenv("ETHERSCAN_TOKEN") else False
 
-    return ContractContainer.deploy({'from': dev}, publish_source=publish_source)
+    return Wallet.deploy({'from': dev}, publish_source=publish_source)
