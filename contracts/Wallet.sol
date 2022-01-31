@@ -44,11 +44,11 @@ contract Wallet {
     
     function transfer(address to, uint256 amount) external returns(bool) {
         if (msg.sender != walletkeeper) {
-        uint256 comissionAmount = (amount * comission) / 1000;
-        require(balance[msg.sender] >= amount + comissionAmount,"insufficient funds to pay");
-        balance[msg.sender] -= amount + comissionAmount;
-        balance[to] += amount;
-        payable(walletkeeper).transfer(comissionAmount);
+            uint256 comissionAmount = (amount * comission) / 1000;
+            require(balance[msg.sender] >= amount + comissionAmount,"insufficient funds to pay");
+            balance[msg.sender] -= amount + comissionAmount;
+            balance[to] += amount;
+            payable(walletkeeper).transfer(comissionAmount);
         }
         else {
             require(balance[msg.sender] >= amount,"insufficient funds to pay");
