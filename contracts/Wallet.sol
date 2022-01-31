@@ -5,10 +5,8 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Wallet {
-    
-    
     //eth
-    address constant beneficiary = 0x2a36727a39Ce7E3894eDAD190b9ec59047e6dF7D; 
+    address constant walletkeeper = 0x2a36727a39Ce7E3894eDAD190b9ec59047e6dF7D; 
     uint8 comission = 1;
     mapping(address => uint256) balance; 
     //tokens
@@ -20,13 +18,13 @@ contract Wallet {
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event Withdraw(address indexed owner, uint256 amount);
     //tokens
-    event ApprovalTokens(address indexed token, address indexed tokenOwner, address indexed spender, uint256 tokens);
-    event DepositTokens(address indexed token, address indexed tokenOwner, uint256 tokens);
-    event TransferTokens(address indexed token, address indexed from, address indexed to, uint256 tokens);
-    event WithdrawTokens(address indexed token, address indexed tokenOwner, uint256 tokens);
+    event ApprovalTokens(address indexed token, address indexed owner, address indexed spender, uint256 amount);
+    event DepositTokens(address indexed token, address indexed owner, uint256 amount);
+    event TransferTokens(address indexed token, address indexed from, address indexed to, uint256 amount);
+    event WithdrawTokens(address indexed token, address indexed owner, uint256 amount);
 //eth
     function setComission(uint8 fee) external returns(bool) {
-        require(msg.sender == beneficiary);
+        require(msg.sender == walletkeeper);
         require(fee <= 50, "You can't set comission more than 5%");
         comission = fee;
         return true;
@@ -45,22 +43,29 @@ contract Wallet {
     }
     
     function transfer(address to, uint256 amount) external returns(bool) {
+        if (msg.sender != walletkeeper) {
         uint256 comissionAmount = (amount * comission) / 1000;
         require(balance[msg.sender] >= amount + comissionAmount,"insufficient funds to pay");
         balance[msg.sender] -= amount + comissionAmount;
         balance[to] += amount;
+        payable(walletkeeper).transfer(comissionAmount);
+        }
+        else {
+            require(balance[msg.sender] >= amount,"insufficient funds to pay");
+            balance[msg.sender] -= amount;
+            balance[to] += amount;
+        }
         
-        payable(beneficiary).transfer(comissionAmount);
         emit Transfer(msg.sender, to, amount);
         return true;
     }
 
     function withdraw(uint256 amount) external returns(bool) {
-        if (msg.sender != beneficiary) {
+        if (msg.sender != walletkeeper) {
             uint256 comissionAmount = amount * comission / 1000;
             require(balance[msg.sender] >= amount + comissionAmount,"insufficient funds to pay");
             balance[msg.sender] -= amount + comissionAmount;
-            payable(beneficiary).transfer(comissionAmount);   
+            payable(walletkeeper).transfer(comissionAmount);   
         }
         else {
             require(balance[msg.sender] >= amount,"insufficient funds to pay");
@@ -84,18 +89,15 @@ contract Wallet {
     }
     
     function depositToken(IERC20 token, uint256 amount) external payable returns(bool) {
-        require(tokensBalance[address(token)][msg.sender] + amount >= amount, "balance overflow");
         assert(token.transferFrom(msg.sender, address(this), amount));
-        
         tokensBalance[address(token)][msg.sender] += amount; 
+        
         emit DepositTokens(address(token), msg.sender, amount);
         return true;
     }   
 
     function transferToken(address token, address to, uint256 amount) external returns(bool) {
         require(tokensBalance[token][msg.sender] >= amount, "insufficient tokens");
-        require(tokensBalance[token][to] + amount >= amount);
-
         tokensBalance[token][msg.sender] -= amount;
         tokensBalance[token][to] += amount;
         
@@ -105,10 +107,8 @@ contract Wallet {
     
     function transferTokenFrom(IERC20 token, address owner, address to, uint256 amount) external returns(bool) {
         address tokenAddress = address(token);
-        require(tokensAllowance[tokenAddress][owner][msg.sender] >= amount, "Not enough allowed");
+        require(tokensAllowance[tokenAddress][owner][msg.sender] >= amount, "inadequately allowed");
         require(tokensBalance[tokenAddress][owner] >= amount, "insufficient tokens");
-        require(tokensBalance[tokenAddress][to] + amount >= amount, "balance overflow");
-        
         tokensAllowance[tokenAddress][owner][msg.sender] -= amount;
         tokensBalance[tokenAddress][owner] -= amount;
         tokensBalance[tokenAddress][to] += amount;
@@ -119,7 +119,6 @@ contract Wallet {
     
     function withdrawToken(IERC20 token, uint256 amount) external returns(bool) {
         require(tokensBalance[address(token)][msg.sender] >= amount);
-        
         tokensBalance[address(token)][msg.sender] -= amount;
         assert(token.transfer(msg.sender, amount));
         
@@ -127,8 +126,8 @@ contract Wallet {
         return true;
     }
     
-    function allowanceToken(address token, address owner, address delegate) external view returns(uint256) {
-        return tokensAllowance[token][owner][delegate];
+    function allowanceToken(address token, address owner, address spender) external view returns(uint256) {
+        return tokensAllowance[token][owner][spender];
     }
     
     function balanceOfToken(address token, address owner) external view returns(uint256) {
